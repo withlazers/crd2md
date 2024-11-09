@@ -47,6 +47,9 @@ fn property_detail(prop: PropertyInfo) -> Vec<Block> {
     }
 
     if let Some(validations) = &prop.schema().x_kubernetes_validations {
+        if prop.schema().properties.is_some() {
+            blocks.push(Paragraph(Inlines(vec![Inline::plain_text("&nbsp;")])));
+        }
         blocks.push(Table {
             alignments: vec![Alignment::Left, Alignment::Left],
             headers: vec![
