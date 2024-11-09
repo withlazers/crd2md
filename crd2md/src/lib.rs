@@ -13,7 +13,10 @@ use markdown_ast::{
 use pulldown_cmark::{Alignment, LinkType};
 use util::to_anchor;
 
-fn property_table(prop: PropertyIter<'_>) -> Block {
+fn property_table(
+    prop: PropertyIter<'_>,
+    f: impl Fn(&PropertyInfo) -> String,
+) -> Block {
     Table {
         alignments: vec![Alignment::Left, Alignment::Left, Alignment::Center],
         headers: vec![
@@ -21,7 +24,7 @@ fn property_table(prop: PropertyIter<'_>) -> Block {
             Inlines(vec![Inline::plain_text("Type")]),
             Inlines(vec![Inline::plain_text("Required")]),
         ],
-        rows: prop.map(property_table_row).collect(),
+        rows: prop.map(|x| property_table_row(x, &f)).collect(),
     }
 }
 
@@ -38,7 +41,9 @@ fn property_detail(prop: PropertyInfo) -> Vec<Block> {
         ])),
     ]);
     if prop.schema().properties.is_some() {
-        blocks.push(property_table(prop.schema().property_iter()));
+        blocks.push(property_table(prop.clone().property_iter(), |p| {
+            p.name().to_string()
+        }));
     }
 
     if let Some(validations) = &prop.schema().x_kubernetes_validations {
@@ -75,7 +80,10 @@ fn property_detail(prop: PropertyInfo) -> Vec<Block> {
     blocks
 }
 
-fn property_table_row(prop: PropertyInfo) -> Vec<Inlines> {
+fn property_table_row(
+    prop: PropertyInfo,
+    f: &impl Fn(&PropertyInfo) -> String,
+) -> Vec<Inlines> {
     let full_name = prop.full_name();
 
     let link = Inline::Link {
@@ -83,7 +91,7 @@ fn property_table_row(prop: PropertyInfo) -> Vec<Inlines> {
         dest_url: to_anchor(&full_name),
         title: "".to_string(),
         id: "".to_string(),
-        content_text: Inlines(vec![Inline::plain_text(&full_name)]),
+        content_text: Inlines(vec![Inline::plain_text(f(&prop))]),
     };
     vec![
         Inlines(vec![link]),
@@ -115,7 +123,9 @@ fn version(version: &CustomResourceDefinitionVersion) -> Vec<Block> {
             .as_ref()
             .unwrap_or(&"*missing*".to_string()),
     ));
-    blocks.push(property_table(schema.property_flat_iter()));
+    blocks.push(property_table(schema.property_flat_iter(), |p| {
+        p.full_name()
+    }));
 
     blocks.extend(schema.property_flat_iter().flat_map(property_detail));
 

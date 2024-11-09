@@ -10,7 +10,7 @@ use crate::{HasProperties, PropertyIter};
 #[derive(Debug, Clone)]
 pub(crate) struct PropertyInfoInner<'a> {
     pub name: String,
-    pub is_array: bool,
+    pub array_level: u8,
     pub is_required: bool,
     pub schema: &'a JSONSchemaProps,
 }
@@ -19,9 +19,21 @@ impl<'a> From<(&String, &'a JSONSchemaProps, &'a JSONSchemaProps)> for PropertyI
     fn from(
         (name, schema, parent_schema): (&String, &'a JSONSchemaProps, &'a JSONSchemaProps),
     ) -> Self {
+        let mut schema = schema;
+        let mut array_level = 0;
+        while let Some(items) = schema.items.as_ref() {
+            match items {
+                Schema(s) => {
+                    schema = s;
+                    array_level += 1;
+                }
+                Schemas(_) => unimplemented!(),
+            }
+        }
+
         Self {
             name: name.clone(),
-            is_array: false,
+            array_level,
             is_required: parent_schema
                 .required
                 .as_ref()
@@ -34,7 +46,7 @@ impl<'a> From<(&String, &'a JSONSchemaProps, &'a JSONSchemaProps)> for PropertyI
 impl fmt::Display for PropertyInfoInner<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.name)?;
-        if self.is_array {
+        for _ in 0..self.array_level {
             write!(f, "[]")?;
         }
         Ok(())
@@ -59,20 +71,17 @@ impl Display for PropertyInfo<'_> {
 }
 
 impl<'a> PropertyInfo<'a> {
-    fn info(&self) -> &PropertyInfoInner<'a> {
+    fn inner(&self) -> &PropertyInfoInner<'a> {
         self.0.last().unwrap()
     }
-    fn info_mut(&mut self) -> &mut PropertyInfoInner<'a> {
-        self.0.last_mut().unwrap()
-    }
-    pub fn name(&self) -> &str {
-        self.info().name.as_str()
+    pub fn name(&self) -> String {
+        self.inner().to_string()
     }
     pub fn is_required(&self) -> bool {
-        self.info().is_required
+        self.inner().is_required
     }
     pub fn schema(&self) -> &'a JSONSchemaProps {
-        self.info().schema
+        self.inner().schema
     }
     pub fn type_(&self) -> &'a str {
         self.schema().type_.as_deref().unwrap_or("object")
@@ -84,30 +93,21 @@ impl<'a> PropertyInfo<'a> {
 
 impl<'a> HasProperties<'a> for PropertyInfo<'a> {
     fn property_iter(self) -> PropertyIter<'a> {
-        if let Some(properties) = self.schema().properties.as_ref() {
-            let parent_schema = self.schema();
+        let schema = self.schema();
+        if let Some(properties) = schema.properties.as_ref() {
             Box::new(
                 properties
                     .iter()
-                    .map(move |(n, s)| (n, s, parent_schema))
+                    .map(move |(n, s)| (n, s, schema))
                     .map(Into::<PropertyInfoInner<'a>>::into)
                     .map(move |x| self.0.clone().into_iter().chain([x]).collect())
                     .map(PropertyInfo),
             )
-        } else if let Some(items) = self.schema().items.as_ref() {
-            let mut self_mut = self;
-            match items {
-                Schema(s) => {
-                    self_mut.info_mut().is_array = true;
-                    self_mut.info_mut().schema = s;
-                }
-                Schemas(_) => unimplemented!(),
-            }
-            self_mut.property_flat_iter()
         } else {
             Box::new(std::iter::empty())
         }
     }
+
     fn property_flat_iter(self) -> PropertyIter<'a> {
         let self_iter = std::iter::once(self.clone());
         let prop_iter = self
