@@ -3,7 +3,7 @@ mod util;
 use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
     CustomResourceDefinition, CustomResourceDefinitionVersion,
 };
-use kube_crd_iter::{HasProperties, HasVersions, PropertyInfo};
+use kube_crd_iter::{HasProperties, HasVersions, PropertyInfo, PropertyIter};
 use markdown_ast::{
     ast_to_markdown, markdown_to_ast,
     Block::{self, *},
@@ -13,17 +13,33 @@ use markdown_ast::{
 use pulldown_cmark::{Alignment, LinkType};
 use util::to_anchor;
 
+fn property_table(prop: PropertyIter<'_>) -> Block {
+    Table {
+        alignments: vec![Alignment::Left, Alignment::Left, Alignment::Center],
+        headers: vec![
+            Inlines(vec![Inline::plain_text("Property")]),
+            Inlines(vec![Inline::plain_text("Type")]),
+            Inlines(vec![Inline::plain_text("Required")]),
+        ],
+        rows: prop.map(property_table_row).collect(),
+    }
+}
+
 fn property_detail(prop: PropertyInfo) -> Vec<Block> {
     let full_name = prop.full_name();
     let mut blocks = vec![];
 
     blocks.extend([
+        Rule,
         Heading(H3, Inlines(vec![Inline::plain_text(&full_name)])),
         Paragraph(Inlines(vec![
             Inline::plain_text("Type: "),
             Inline::plain_text(prop.type_()),
         ])),
     ]);
+    if prop.schema().properties.is_some() {
+        blocks.push(property_table(prop.schema().property_iter()));
+    }
 
     if let Some(validations) = &prop.schema().x_kubernetes_validations {
         blocks.extend([
@@ -59,7 +75,7 @@ fn property_detail(prop: PropertyInfo) -> Vec<Block> {
     blocks
 }
 
-fn property_table(prop: PropertyInfo) -> Vec<Inlines> {
+fn property_table_row(prop: PropertyInfo) -> Vec<Inlines> {
     let full_name = prop.full_name();
 
     let link = Inline::Link {
@@ -99,15 +115,7 @@ fn version(version: &CustomResourceDefinitionVersion) -> Vec<Block> {
             .as_ref()
             .unwrap_or(&"*missing*".to_string()),
     ));
-    blocks.push(Table {
-        alignments: vec![Alignment::Left, Alignment::Left, Alignment::Center],
-        headers: vec![
-            Inlines(vec![Inline::plain_text("Name")]),
-            Inlines(vec![Inline::plain_text("Type")]),
-            Inlines(vec![Inline::plain_text("Required")]),
-        ],
-        rows: schema.property_flat_iter().map(property_table).collect(),
-    });
+    blocks.push(property_table(schema.property_flat_iter()));
 
     blocks.extend(schema.property_flat_iter().flat_map(property_detail));
 
