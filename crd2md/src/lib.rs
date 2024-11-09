@@ -47,27 +47,24 @@ fn property_detail(prop: PropertyInfo) -> Vec<Block> {
     }
 
     if let Some(validations) = &prop.schema().x_kubernetes_validations {
-        blocks.extend([
-            Heading(H4, Inlines(vec![Inline::plain_text("Validations")])),
-            Table {
-                alignments: vec![Alignment::Left, Alignment::Left],
-                headers: vec![
-                    Inlines(vec![Inline::plain_text("Rule")]),
-                    Inlines(vec![Inline::plain_text("Error Message")]),
-                ],
-                rows: validations
-                    .iter()
-                    .map(|v| {
-                        vec![
-                            Inlines(vec![Inline::plain_text(&v.rule)]),
-                            Inlines(vec![Inline::plain_text(
-                                v.message.clone().unwrap_or_default(),
-                            )]),
-                        ]
-                    })
-                    .collect(),
-            },
-        ]);
+        blocks.push(Table {
+            alignments: vec![Alignment::Left, Alignment::Left],
+            headers: vec![
+                Inlines(vec![Inline::plain_text("Validation Rule")]),
+                Inlines(vec![Inline::plain_text("Error Message")]),
+            ],
+            rows: validations
+                .iter()
+                .map(|v| {
+                    vec![
+                        Inlines(vec![Inline::plain_text(&v.rule)]),
+                        Inlines(vec![Inline::plain_text(
+                            v.message.clone().unwrap_or_default(),
+                        )]),
+                    ]
+                })
+                .collect(),
+        });
     }
 
     blocks.extend(markdown_to_ast(
