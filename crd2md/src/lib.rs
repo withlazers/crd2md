@@ -16,8 +16,8 @@ use util::to_anchor;
 fn property_table(
     prop: PropertyIter<'_>,
     f: impl Fn(&PropertyInfo) -> String,
-) -> Block {
-    Table {
+) -> String {
+    ast_to_markdown(&[Table {
         alignments: vec![Alignment::Left, Alignment::Left, Alignment::Center],
         headers: vec![
             Inlines(vec![Inline::plain_text("Property")]),
@@ -25,21 +25,21 @@ fn property_table(
             Inlines(vec![Inline::plain_text("Required")]),
         ],
         rows: prop.map(|x| property_table_row(x, &f)).collect(),
-    }
+    }])
 }
 
-fn property_detail(prop: PropertyInfo) -> Vec<Block> {
+fn property_detail(prop: PropertyInfo) -> Vec<String> {
     let full_name = prop.full_name();
     let mut blocks = vec![];
 
-    blocks.extend([
+    blocks.push(ast_to_markdown(&[
         Rule,
         Heading(H3, Inlines(vec![Inline::plain_text(&full_name)])),
         Paragraph(Inlines(vec![
             Inline::plain_text("Type: "),
             Inline::plain_text(prop.type_()),
         ])),
-    ]);
+    ]));
     if prop.schema().properties.is_some() {
         blocks.push(property_table(prop.clone().property_iter(), |p| {
             p.name().to_string()
@@ -48,9 +48,9 @@ fn property_detail(prop: PropertyInfo) -> Vec<Block> {
 
     if let Some(validations) = &prop.schema().x_kubernetes_validations {
         if prop.schema().properties.is_some() {
-            blocks.push(Paragraph(Inlines(vec![Inline::plain_text("&nbsp;")])));
+            blocks.push("&nbsp;".to_string());
         }
-        blocks.push(Table {
+        blocks.push(ast_to_markdown(&[Table {
             alignments: vec![Alignment::Left, Alignment::Left],
             headers: vec![
                 Inlines(vec![Inline::plain_text("Validation Rule")]),
@@ -67,15 +67,15 @@ fn property_detail(prop: PropertyInfo) -> Vec<Block> {
                     ]
                 })
                 .collect(),
-        });
+        }]));
     }
 
-    blocks.extend(markdown_to_ast(
+    blocks.push(
         prop.schema()
             .description
-            .as_ref()
-            .unwrap_or(&"*missing*".to_string()),
-    ));
+            .clone()
+            .unwrap_or("*missing*".to_string()),
+    );
 
     blocks
 }
@@ -106,37 +106,34 @@ fn property_table_row(
     ]
 }
 
-fn version(version: &CustomResourceDefinitionVersion) -> Vec<Block> {
-    let mut blocks = vec![];
-    blocks.extend(vec![Heading(
+fn version(version: &CustomResourceDefinitionVersion) -> Vec<String> {
+    let mut blocks = vec![ast_to_markdown(&[Heading(
         H2,
         markdown_ast::Inlines(vec![Inline::plain_text(version.name.clone())]),
-    )]);
+    )])];
     let schema = version
         .schema
         .as_ref()
         .and_then(|s| s.open_api_v3_schema.as_ref())
         .unwrap();
-    blocks.extend(markdown_to_ast(
+    blocks.extend([
         schema
             .description
-            .as_ref()
-            .unwrap_or(&"*missing*".to_string()),
-    ));
-    blocks.push(property_table(schema.property_flat_iter(), |p| {
-        p.full_name()
-    }));
+            .clone()
+            .unwrap_or("*missing*".to_string()),
+        property_table(schema.property_flat_iter(), |p| p.full_name()),
+    ]);
 
     blocks.extend(schema.property_flat_iter().flat_map(property_detail));
 
     blocks
 }
 
-fn crd(crd: &CustomResourceDefinition) -> Vec<Block> {
-    let mut blocks = vec![Heading(
+fn crd(crd: &CustomResourceDefinition) -> Vec<String> {
+    let mut blocks = vec![ast_to_markdown(&[Heading(
         H1,
         markdown_ast::Inlines(vec![Inline::plain_text(&crd.spec.names.kind)]),
-    )];
+    )])];
     blocks.extend(crd.version_iter().flat_map(version));
     blocks
 }
@@ -147,6 +144,6 @@ pub trait ToMarkdown {
 
 impl ToMarkdown for CustomResourceDefinition {
     fn to_markdown(&self) -> String {
-        ast_to_markdown(&crd(self))
+        crd(self).join("\n\n")
     }
 }
