@@ -23,22 +23,20 @@ fn main() -> Result<()> {
     let input = opts.input.unwrap_or(PathBuf::from("-"));
     let input: Vec<Deserializer> = if input == PathBuf::from("-") {
         vec![Deserializer::from_reader(std::io::stdin())]
+    } else if input.is_dir() {
+        std::fs::read_dir(input)?
+            .filter_map(|entry| {
+                let path = entry.ok()?.path();
+                ALLOWED_EXTENSIONS
+                    .contains(&path.extension()?.to_str()?)
+                    .then_some(path)
+            })
+            .map(|input| {
+                Ok(Deserializer::from_reader(std::fs::File::open(input)?))
+            })
+            .collect::<Result<Vec<Deserializer>>>()?
     } else {
-        if input.is_dir() {
-            std::fs::read_dir(input)?
-                .filter_map(|entry| {
-                    let path = entry.ok()?.path();
-                    ALLOWED_EXTENSIONS
-                        .contains(&path.extension()?.to_str()?)
-                        .then_some(path)
-                })
-                .map(|input| {
-                    Ok(Deserializer::from_reader(std::fs::File::open(input)?))
-                })
-                .collect::<Result<Vec<Deserializer>>>()?
-        } else {
-            vec![Deserializer::from_reader(File::open(input)?)]
-        }
+        vec![Deserializer::from_reader(File::open(input)?)]
     };
 
     if opts.dir {
