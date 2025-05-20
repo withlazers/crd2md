@@ -5,10 +5,7 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::{
 };
 use kube_crd_iter::{HasProperties, HasVersions, PropertyInfo, PropertyIter};
 use markdown_ast::{
-    ast_to_markdown, markdown_to_ast,
-    Block::{self, *},
-    HeadingLevel::*,
-    Inline, Inlines,
+    ast_to_markdown, Block::*, HeadingLevel::*, Inline, Inlines,
 };
 use pulldown_cmark::{Alignment, LinkType};
 use util::to_anchor;
