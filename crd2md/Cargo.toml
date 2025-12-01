@@ -5,12 +5,12 @@ edition = "2021"
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.5.38", features = ["derive"] }
-k8s-openapi = { version = "0.25.0", features = ["latest"] }
+clap = { version = "4.5.53", features = ["derive"] }
+k8s-openapi = { version = "0.26.0", features = ["latest"] }
 markdown-ast = "0.1.1"
 #markdown-ast = { git = "https://github.com/Gottox/Markdown.git" }
 #markdown-ast = { path = "../../Markdown/crates/markdown-ast" }
 serde_yaml = "0.9.34"
-pulldown-cmark = "0.11.3"
+pulldown-cmark = "0.13.0"
 kube_crd_iter = { path = "../kube_crd_iter" }
-serde = "1.0.219"
+serde = "1.0.228"
