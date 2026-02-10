@@ -5,3 +5,6 @@ resolver = "2"
 members = [
     "crd2md", "kube_crd_iter",
 ]
+
+[workspace.package]
+license = "MIT"
